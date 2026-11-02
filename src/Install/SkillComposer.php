@@ -7,7 +7,9 @@ namespace Laravel\Boost\Install;
 use Illuminate\Support\Collection;
 use Laravel\Boost\Concerns\RendersBladeGuidelines;
 use Laravel\Boost\Install\Concerns\DiscoverPackagePaths;
+use Laravel\Boost\Support\PackageRegistry;
 use Laravel\Boost\Support\SkillParseFailures;
+use Laravel\Boost\Support\UninstalledPackages;
 use Laravel\Roster\Package;
 use Laravel\Roster\ProjectManager;
 use Symfony\Component\Yaml\Exception\ParseException;
@@ -105,6 +107,10 @@ class SkillComposer
 
                 $vendorSkillPath = $this->resolveFirstPartyBoostPath($package, 'skills');
 
+                if ($this->isLockedButNotInstalled($package)) {
+                    app(UninstalledPackages::class)->record($package->name());
+                }
+
                 $vendorSkills = $vendorSkillPath !== null
                     ? $this->discoverSkillsFromDirectory($vendorSkillPath, $name)
                     : collect();
@@ -118,6 +124,16 @@ class SkillComposer
             });
 
         return $skills;
+    }
+
+    /**
+     * A package read from the lock file whose directory is missing may ship skills Boost cannot see.
+     */
+    protected function isLockedButNotInstalled(Package $package): bool
+    {
+        return PackageRegistry::isFirstParty($package)
+            && $package->path() !== null
+            && ! is_dir($package->path());
     }
 
     /**

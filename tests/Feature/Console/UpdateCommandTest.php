@@ -170,6 +170,76 @@ it('preserves tracked skills with unusable frontmatter while completing the upda
     'missing name' => ['incomplete-frontmatter', 'The frontmatter must define both [name] and [description].'],
 ]);
 
+it('preserves tracked skills while a locked first-party package is not installed', function (): void {
+    $packagePath = base_path('node_modules-'.uniqid().'/@inertiajs/react');
+    $project = Double::for(ProjectManager::class, override: true)->instance();
+    mockProjectPackages($project, new PackageCollection([
+        rosterPackage('@inertiajs/react', '3.0.0', path: $packagePath)->setDirect(),
+    ]));
+    $this->app->instance(ProjectManager::class, $project);
+
+    $agentSkillsPath = '.boost-test-skills-'.uniqid();
+    $installedSkillDir = base_path($agentSkillsPath.'/inertia-react-development');
+    @mkdir($installedSkillDir, 0755, true);
+    file_put_contents($installedSkillDir.'/SKILL.md', 'previously installed');
+
+    config([
+        'boost.agents.claude_code.skills_path' => $agentSkillsPath,
+        'boost.enforce_tests' => false,
+    ]);
+
+    $config = new Config;
+    $config->setAgents(['claude_code']);
+    $config->setSkills(['inertia-react-development']);
+
+    try {
+        expect(Artisan::call('boost:update', ['--no-discover' => true]))->toBe(0)
+            ->and(Artisan::output())
+            ->toContain('Kept existing skills unchanged because 1 locked package is not installed: @inertiajs/react.')
+            ->toContain('Boost guidelines and skills updated successfully.');
+
+        expect((new Config)->getSkills())->toContain('inertia-react-development')
+            ->and(file_get_contents($installedSkillDir.'/SKILL.md'))->toBe('previously installed');
+    } finally {
+        (new Filesystem)->deleteDirectory(base_path($agentSkillsPath));
+    }
+});
+
+it('removes tracked skills that an installed package no longer ships', function (): void {
+    $packagePath = base_path('node_modules-'.uniqid().'/@inertiajs/react');
+    @mkdir($packagePath, 0755, true);
+    $project = Double::for(ProjectManager::class, override: true)->instance();
+    mockProjectPackages($project, new PackageCollection([
+        rosterPackage('@inertiajs/react', '3.0.0', path: $packagePath)->setDirect(),
+    ]));
+    $this->app->instance(ProjectManager::class, $project);
+
+    $agentSkillsPath = '.boost-test-skills-'.uniqid();
+    $installedSkillDir = base_path($agentSkillsPath.'/inertia-react-development');
+    @mkdir($installedSkillDir, 0755, true);
+    file_put_contents($installedSkillDir.'/SKILL.md', 'previously installed');
+
+    config([
+        'boost.agents.claude_code.skills_path' => $agentSkillsPath,
+        'boost.enforce_tests' => false,
+    ]);
+
+    $config = new Config;
+    $config->setAgents(['claude_code']);
+    $config->setSkills(['inertia-react-development']);
+
+    try {
+        expect(Artisan::call('boost:update', ['--no-discover' => true]))->toBe(0)
+            ->and(Artisan::output())->not->toContain('Kept existing skills unchanged');
+
+        expect((new Config)->getSkills())->not->toContain('inertia-react-development')
+            ->and($installedSkillDir)->not->toBeDirectory();
+    } finally {
+        (new Filesystem)->deleteDirectory(base_path($agentSkillsPath));
+        (new Filesystem)->deleteDirectory(dirname($packagePath, 2));
+    }
+});
+
 it('calls install command with both flags when guidelines and skills are enabled', function (): void {
     $config = new Config;
     $config->setAgents(['claude_code']);

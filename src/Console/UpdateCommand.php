@@ -7,9 +7,11 @@ namespace Laravel\Boost\Console;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Laravel\Boost\Concerns\ReportsSkillParseFailures;
+use Laravel\Boost\Concerns\ReportsUninstalledPackages;
 use Laravel\Boost\Install\ThirdPartyPackage;
 use Laravel\Boost\Support\Config;
 use Laravel\Boost\Support\SkillParseFailures;
+use Laravel\Boost\Support\UninstalledPackages;
 use Laravel\Roster\ProjectManager;
 use Symfony\Component\Console\Attribute\AsCommand;
 
@@ -19,6 +21,7 @@ use function Laravel\Prompts\multiselect;
 class UpdateCommand extends Command
 {
     use ReportsSkillParseFailures;
+    use ReportsUninstalledPackages;
 
     /** @var string */
     protected $signature = 'boost:update
@@ -29,6 +32,7 @@ class UpdateCommand extends Command
     public function handle(Config $config, ProjectManager $project): int
     {
         app(SkillParseFailures::class)->flush();
+        app(UninstalledPackages::class)->flush();
 
         if (! $config->isValid()) {
             $this->error('Please set up Boost with [php artisan boost:install] first.');
@@ -60,6 +64,7 @@ class UpdateCommand extends Command
         ]);
 
         $this->reportSkillParseFailures();
+        $this->reportUninstalledPackages();
 
         $this->info('Boost guidelines and skills updated successfully.');
 

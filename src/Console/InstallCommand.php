@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Laravel\Boost\Concerns\DisplayHelper;
 use Laravel\Boost\Concerns\ReportsSkillParseFailures;
+use Laravel\Boost\Concerns\ReportsUninstalledPackages;
 use Laravel\Boost\Contracts\SupportsGuidelines;
 use Laravel\Boost\Contracts\SupportsMcp;
 use Laravel\Boost\Contracts\SupportsSkills;
@@ -30,6 +31,7 @@ use Laravel\Boost\Rules\RuleRepository;
 use Laravel\Boost\Support\Config;
 use Laravel\Boost\Support\RenderFailures;
 use Laravel\Boost\Support\SkillParseFailures;
+use Laravel\Boost\Support\UninstalledPackages;
 use Laravel\Prompts\Terminal;
 use Laravel\Roster\ProjectManager;
 use RuntimeException;
@@ -45,6 +47,7 @@ class InstallCommand extends Command
 {
     use DisplayHelper;
     use ReportsSkillParseFailures;
+    use ReportsUninstalledPackages;
 
     protected $signature = 'boost:install
         {--guidelines : Install AI guidelines}
@@ -89,6 +92,7 @@ class InstallCommand extends Command
     public function handle(): int
     {
         app(SkillParseFailures::class)->flush();
+        app(UninstalledPackages::class)->flush();
 
         $this->terminal->initDimensions();
         $this->projectName = config('app.name');
@@ -100,6 +104,7 @@ class InstallCommand extends Command
 
         $this->reportRenderFailures();
         $this->reportSkillParseFailures();
+        $this->reportUninstalledPackages();
 
         $this->noteInferConventions();
 
@@ -477,7 +482,9 @@ class InstallCommand extends Command
         $previouslyTrackedSkills = $this->config->getSkills();
         // Matched on directory name: boost.json tracks frontmatter names, which are unreadable here.
         $invalidSkillNames = app(SkillParseFailures::class)->skillNames();
-        $preservedSkillNames = array_values(array_intersect($previouslyTrackedSkills, $invalidSkillNames));
+        $preservedSkillNames = app(UninstalledPackages::class)->isEmpty()
+            ? array_values(array_intersect($previouslyTrackedSkills, $invalidSkillNames))
+            : array_values(array_diff($previouslyTrackedSkills, $skills->keys()->all()));
         $trackedSkillsToSync = array_values(array_diff($previouslyTrackedSkills, $preservedSkillNames));
 
         $this->installedSkillNames = array_values(array_unique([

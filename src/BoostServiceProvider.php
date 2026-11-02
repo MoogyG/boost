@@ -21,6 +21,7 @@ use Laravel\Boost\Services\BrowserLogger;
 use Laravel\Boost\Support\Config;
 use Laravel\Boost\Support\RenderFailures;
 use Laravel\Boost\Support\SkillParseFailures;
+use Laravel\Boost\Support\UninstalledPackages;
 use Laravel\Mcp\Facades\Mcp;
 use Laravel\Roster\ProjectManager;
 
@@ -35,6 +36,7 @@ class BoostServiceProvider extends ServiceProvider
 
         $this->app->singleton(RenderFailures::class, fn (): RenderFailures => new RenderFailures);
         $this->app->singleton(SkillParseFailures::class, fn (): SkillParseFailures => new SkillParseFailures);
+        $this->app->singleton(UninstalledPackages::class, fn (): UninstalledPackages => new UninstalledPackages);
 
         if (! $this->shouldRun()) {
             return;
